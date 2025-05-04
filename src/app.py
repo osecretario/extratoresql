@@ -1,11 +1,13 @@
 from fastapi import FastAPI, Body, File, UploadFile
 from fastapi.responses import RedirectResponse
 from .helpers import get_gpt_response
-from typing import Any
+from typing import Any, List
 from .functions import converter_para_json, extrair_conteudo_json, get_query
-from .llm import prompt_crm, prompt_debito, prompt_diploma, prompt_especialista, prompt_etico, prompt_rg, gerar_query_sql  
+from .llm import prompt_crm, prompt_debito, prompt_diploma, prompt_especialista, prompt_etico, prompt_rg, gerar_query_sql, merge_obj_gpt
 from .bd import estrutura_bd
 import json
+import io
+
 from .functions import encode_image
 import requests
 import os
@@ -23,58 +25,69 @@ async def root():
 
 
 @app.post("/extract_rg")
-async def extract_rg(file: UploadFile = File(...)):
+async def extract_rg(files: List[UploadFile] = File(...)):
+    lista_obj = []
     try:
-        print ('Entrei')
-        contents = await file.read()
-        print ('passei do file read')
-        with open(file.filename, 'wb') as f:
-            f.write(contents)
-        print ('passei do file write')
-        base64_image = encode_image(file.filename)
-        print ('passei do base64')
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {aux_key}"
-        }
-        prompt_rg = f"""
-    Você irá receber um documento referente a um documento de identidade brasileiro que foi autorizado pelo titular a extração dos dados utilizando IA. Sua função é extrair as seguintes informações do documento e colocar em formato json: Nome, Registro Geral, data de nascimento, nome da mãe, nacionalidade, Estado, cpf, data de expedição.
-    """ 
-        payload = {
-            "model": "gpt-4.1-2025-04-14",
-            "messages": [
-            {
-                "role": "user",
-                "content": [
-                {
-                    "type": "text",
-                    "text": prompt_rg
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {
-                    "url": f"data:image/jpeg;base64,{base64_image}"
-                    }
-                }
-                ]
+        for file in files:
+            print ('Entrei')
+            contents = await file.read()
+            print ('passei do file read')
+            with open(file.filename, 'wb') as f:
+                f.write(contents)
+            print ('passei do file write')
+            base64_image = encode_image(file.filename)
+            print ('passei do base64')
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {aux_key}"
             }
-            ],
-            "max_tokens": 300
-        }
-        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+            prompt_rg = f"""
+        Você irá receber um documento referente a um documento de identidade brasileiro que foi autorizado pelo titular a extração dos dados utilizando IA. Sua função é extrair as seguintes informações do documento e colocar em formato json: Nome, Registro Geral, data de nascimento, nome da mãe, nacionalidade, Estado, cpf, data de expedição.
+        """ 
+            payload = {
+                "model": "gpt-4.1-2025-04-14",
+                "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                    {
+                        "type": "text",
+                        "text": prompt_rg
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_image}"
+                        }
+                    }
+                    ]
+                }
+                ],
+                "max_tokens": 300
+            }
+            response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
 
-        resposta = response.json()
-        resposta_str = resposta['choices'][0]['message']['content']
+            resposta = response.json()
+            resposta_str = resposta['choices'][0]['message']['content']
 
-        json_obj = converter_para_json(resposta_str)
-        if json_obj == None:
-            json_obj = extrair_conteudo_json(resposta_str)
+            json_obj = converter_para_json(resposta_str)
+            if json_obj == None:
+                json_obj = extrair_conteudo_json(resposta_str)
+                lista_obj.append(json_obj)
+            else:
+                lista_obj.append(json_obj)
 
-        if os.path.exists(file.filename):
-            os.remove(file.filename)
+            if os.path.exists(file.filename):
+                os.remove(file.filename)
+
     except Exception as e:
         print (e)
-    return json_obj
+    resposta_final = merge_obj_gpt(lista_obj)
+    try:
+        obj_final = json.loads(resposta_final)
+        return obj_final
+    except:
+        return resposta_final
 
 
 @app.post("/extract_especialidade")
