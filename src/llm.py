@@ -7,9 +7,27 @@ aux_key = os.environ["OPEN_AI"]
 
 client = OpenAI(api_key=aux_key)
 
+def merge_obj_gpt(contexto):
+    prompt = f"""
+Você é um assistente digital que trabalha com dados extraidos de imagens. Você irá receber uma lista de objetos contendo diversas extrações do mesmo documento. Seu dever é juntar tudo em unico objeto JSON com as informações corretas. Coloque as datas no formato YYYY-MM-DD.
+Segue a lista de extração:
+{contexto}
+"""
+    resposta = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "Você é um assistente que segue instruções."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0
+    )
+
+    return resposta.choices[0].message.content.strip()
+
+
 def gerar_query_sql(pergunta_usuario, estrutura_bd):
     prompt = f"""
-Você é um assistente que converte perguntas em linguagem natural para SQL, mais especificamente para um banco de dados em postgreSQL. Lembre sempre de usar as variáveis do map. Lembrando que hoje é dia {datetime.now()}, já coloque as datas com os dias corretos. Para contadores, utilize a chave primária ao invés do *.
+Você é um assistente que converte perguntas em linguagem natural para SQL, mais especificamente para um banco de dados em postgreSQL. Lembre sempre de usar as variáveis do map. Lembrando que hoje é dia {datetime.now()}, já coloque as datas com os dias corretos. Para contadores, utilize a chave primária ao invés do *. Sempre que a pergunta não for um contador, ou seja, sempre que o desejo é ver uma planilha do banco de dados, você deve mostrar somente os 10 ultimos registros.
 
 Estrutura do banco de dados:
 {estrutura_bd}
