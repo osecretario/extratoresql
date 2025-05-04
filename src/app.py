@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 from .helpers import get_gpt_response
 from typing import Any, List
 from .functions import converter_para_json, extrair_conteudo_json, get_query
-from .llm import prompt_crm, prompt_debito, prompt_diploma, prompt_especialista, prompt_etico, prompt_rg, gerar_query_sql, merge_obj_gpt
+from .llm import prompt_crm, prompt_debito, prompt_diploma, prompt_especialista, prompt_etico, prompt_rg, gerar_query_sql, merge_obj_gpt, gerar_resposta_sql
 from .bd import estrutura_bd
 import json
 import io
@@ -176,7 +176,12 @@ async def extract_sql(payload: Any = Body(None)):
     resposta = gerar_query_sql(pergunta, estrutura_bd)
     print (resposta)
     final = get_query(resposta)
+    dict_contexto = {
+        "query" : resposta,
+        "resultado":final
+    }
+    resposta_final = gerar_resposta_sql(final)
     dict_resposta = {
-        "resposta" : final
+        "resposta" : resposta_final
     }
     return dict_resposta
