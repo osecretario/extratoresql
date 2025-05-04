@@ -24,6 +24,24 @@ Segue a lista de extração:
 
     return resposta.choices[0].message.content.strip()
 
+def gerar_resposta_sql(contexto):
+    prompt = f"""
+Você é um assistente de banco de dados. Você irá receber como contexto uma query de um banco de dados. Seu dever é explicar o resultado em linguagem natural, ou seja, deve resumir as informações da tabela que voce ira receber. Você não deve explicar o que é a tabela, mas sim os dados que estão nela. Você irá receber uma tabela com 10 registros, resuma-os 10 em linguagem natural. Você também pode receber uma resposta no formato de um numero, isso representa a resposta de um contador quando você receber isso simplesmente retorne o numero.
+Contexto:
+{contexto}
+Sua resposta:
+"""
+    resposta = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "Você é um assistente interpreta gera SQL com precisão."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0
+    )
+
+    return resposta.choices[0].message.content.strip()
+
 
 def gerar_query_sql(pergunta_usuario, estrutura_bd):
     prompt = f"""
